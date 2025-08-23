@@ -1,55 +1,44 @@
-name: Build Android APK
+name: Android APK Build
 
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
+      - main # or master
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18' # Use a stable Node.js version
 
-      - name: Install Cordova CLI
-        run: npm install -g cordova
+    - name: Install Cordova CLI
+      run: npm install -g cordova
 
-      - name: Install dependencies (plugins)
-        run: npm install # Installs dependencies listed in package.json
+    - name: Install dependencies (plugins)
+      run: npm install # This will install plugins from package.json if present
 
-      - name: Add Android platform
-        # Conditionally add platform if not already present (e.g., in CI environments)
-        # This ensures the platform is set up correctly for the build
-        run: |-
-          if [ ! -d "platforms/android" ]; then
-            cordova platform add android --no-save
-          else
-            echo "Android platform already added. Skipping 'cordova platform add'."
-          fi
+    - name: Add Android platform
+      # Use --no-save to prevent modifying package.json and config.xml unnecessarily on CI
+      # And only if platforms/android doesn't already exist from a previous step (unlikely on fresh runner)
+      run: |
+        if [ ! -d "platforms/android" ]; then
+          cordova platform add android --no-save
+        else
+          echo "Android platform already added."
+        fi
 
-      - name: Build Android Release APK
-        run: cordova build android --release
+    - name: Build Android release APK
+      run: cordova build android --release
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4 # Updated from v3 to v4
-        with:
-          name: android-apk
-          path: platforms/android/app/build/outputs/apk/release/app-release.apk
-
-      # Optional: Instructions for signing the APK (for production)
-      # - name: Sign APK (Manual Step for Production)
-      #   run: |
-      #     echo "Important: The generated APK is unsigned. For Google Play Store or secure distribution,"
-      #     echo "you must sign it with your own keystore after downloading. Example commands:"
-      #     echo "  jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore app-release-unsigned.apk alias_name"
-      #     echo "  zipalign -v 4 app-release-unsigned.apk my-signed-aligned.apk"
-      #     echo "  apksigner sign --ks my-release-key.keystore my-signed-aligned.apk"
-      #     echo "For more details: https://cordova.apache.org/docs/en/latest/guide/platforms/android/index.html#signing-an-app"
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-release-apk
+        path: platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk # Corrected filename
