@@ -1,0 +1,56 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install Cordova CLI
+      run: npm install -g cordova@12.0.0
+
+    - name: Create Cordova project structure (if not exists)
+      run: |
+        if [ ! -d "platforms" ]; then
+          cordova platform add android --no-save
+        fi
+      working-directory: ./website-to-apk
+
+    - name: Build Android Release APK
+      run: cordova build android --release -- -- --enable-gradle-parallel --gradle-options="--daemon"
+      working-directory: ./website-to-apk
+
+    - name: Sign APK (Placeholder - Manual Signing)
+      run: |
+        echo "--------------------------------------------------"
+        echo "Note: The APK built is unsigned. For production, you will need to sign it manually."
+        echo "  1. Generate a keystore: keytool -genkey -v -keystore my-release-key.keystore -alias alias_name -keyalg RSA -keysize 2048 -validity 10000"
+        echo "  2. Sign the APK: jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk alias_name"
+        echo "  3. Optimize with zipalign: zipalign -v 4 platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk my-app.apk"
+        echo "--------------------------------------------------"
+      # This step is just for instructions. No actual signing happens here.
+
+    - name: Upload Unsigned Release APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: android-release-apk-unsigned
+        path: website-to-apk/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+    - name: Upload Debug APK (for testing)
+      uses: actions/upload-artifact@v3
+      with:
+        name: android-debug-apk
+        path: website-to-apk/platforms/android/app/build/outputs/apk/debug/app-debug.apk
