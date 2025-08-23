@@ -11,46 +11,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
 
-    - name: Install Cordova CLI
-      run: npm install -g cordova@12.0.0
+      - name: Install Cordova CLI
+        run: npm install -g cordova
 
-    - name: Create Cordova project structure (if not exists)
-      run: |
-        if [ ! -d "platforms" ]; then
-          cordova platform add android --no-save
-        fi
-      working-directory: ./website-to-apk
+      - name: Install dependencies (plugins)
+        run: npm install # Installs dependencies listed in package.json
 
-    - name: Build Android Release APK
-      run: cordova build android --release -- -- --enable-gradle-parallel --gradle-options="--daemon"
-      working-directory: ./website-to-apk
+      - name: Add Android platform
+        # Conditionally add platform if not already present (e.g., in CI environments)
+        # This ensures the platform is set up correctly for the build
+        run: |-
+          if [ ! -d "platforms/android" ]; then
+            cordova platform add android --no-save
+          else
+            echo "Android platform already added. Skipping 'cordova platform add'."
+          fi
 
-    - name: Sign APK (Placeholder - Manual Signing)
-      run: |
-        echo "--------------------------------------------------"
-        echo "Note: The APK built is unsigned. For production, you will need to sign it manually."
-        echo "  1. Generate a keystore: keytool -genkey -v -keystore my-release-key.keystore -alias alias_name -keyalg RSA -keysize 2048 -validity 10000"
-        echo "  2. Sign the APK: jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk alias_name"
-        echo "  3. Optimize with zipalign: zipalign -v 4 platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk my-app.apk"
-        echo "--------------------------------------------------"
-      # This step is just for instructions. No actual signing happens here.
+      - name: Build Android Release APK
+        run: cordova build android --release
 
-    - name: Upload Unsigned Release APK
-      uses: actions/upload-artifact@v3
-      with:
-        name: android-release-apk-unsigned
-        path: website-to-apk/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4 # Updated from v3 to v4
+        with:
+          name: android-apk
+          path: platforms/android/app/build/outputs/apk/release/app-release.apk
 
-    - name: Upload Debug APK (for testing)
-      uses: actions/upload-artifact@v3
-      with:
-        name: android-debug-apk
-        path: website-to-apk/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+      # Optional: Instructions for signing the APK (for production)
+      # - name: Sign APK (Manual Step for Production)
+      #   run: |
+      #     echo "Important: The generated APK is unsigned. For Google Play Store or secure distribution,"
+      #     echo "you must sign it with your own keystore after downloading. Example commands:"
+      #     echo "  jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore app-release-unsigned.apk alias_name"
+      #     echo "  zipalign -v 4 app-release-unsigned.apk my-signed-aligned.apk"
+      #     echo "  apksigner sign --ks my-release-key.keystore my-signed-aligned.apk"
+      #     echo "For more details: https://cordova.apache.org/docs/en/latest/guide/platforms/android/index.html#signing-an-app"
