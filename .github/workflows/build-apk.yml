@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   build:
@@ -22,31 +23,24 @@ jobs:
         run: npm install -g cordova
 
       - name: Install dependencies (plugins)
-        run: |
-          # Create a dummy package.json if it doesn't exist for npm install to work
-          if [ ! -f package.json ]; then
-            echo '{ "name": "temp-cordova", "version": "1.0.0", "private": true }' > package.json
-          fi
-          npm install # This will install plugins listed in package.json devDependencies
-          
+        run: npm install # Installs dependencies from package.json including plugins
+
       - name: Add Android platform
-        run: |
-          # Only add if platforms directory doesn't exist to avoid issues on re-runs
+        # Add Android platform only if it doesn't already exist from a previous build artifact
+        # In a fresh CI/CD environment, this usually runs once.
+        run: |-
           if [ ! -d "platforms/android" ]; then
             cordova platform add android --no-save
+          else
+            echo "Android platform already exists."
           fi
 
-      - name: Build Android Release APK
-        run: cordova build android --release
+      - name: Build Android debug APK
+        run: cordova build android --debug # Building debug APK
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: android-release-apk
-          path: platforms/android/app/build/outputs/apk/release/*.apk
-          # For a production app on Google Play, you MUST sign it with your own keystore.
-          # The generated APK (often app-release-unsigned.apk) is not signed.
-          # Instructions for manual signing:
-          # 1. Generate a keystore: keytool -genkey -v -keystore my-release-key.keystore -alias alias_name -keyalg RSA -keysize 2048 -validity 10000
-          # 2. Sign the APK: jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk alias_name
-          # 3. Optimize the APK: zipalign 4 platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk my-app.apk
+          name: android-debug-apk
+          path: platforms/android/app/build/outputs/apk/debug/app-debug.apk # Correct path for debug APK
+          retention-days: 7 # Optional: how long to keep the artifact
