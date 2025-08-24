@@ -3,42 +3,50 @@ name: Android APK Build
 on:
   push:
     branches:
-      - main # or master
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18' # Use a stable Node.js version
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-    - name: Install Cordova CLI
-      run: npm install -g cordova
+      - name: Install Cordova CLI
+        run: npm install -g cordova
 
-    - name: Install dependencies (plugins)
-      run: npm install # This will install plugins from package.json if present
+      - name: Install dependencies (plugins)
+        run: |
+          # Create a dummy package.json if it doesn't exist for npm install to work
+          if [ ! -f package.json ]; then
+            echo '{ "name": "temp-cordova", "version": "1.0.0", "private": true }' > package.json
+          fi
+          npm install # This will install plugins listed in package.json devDependencies
+          
+      - name: Add Android platform
+        run: |
+          # Only add if platforms directory doesn't exist to avoid issues on re-runs
+          if [ ! -d "platforms/android" ]; then
+            cordova platform add android --no-save
+          fi
 
-    - name: Add Android platform
-      # Use --no-save to prevent modifying package.json and config.xml unnecessarily on CI
-      # And only if platforms/android doesn't already exist from a previous step (unlikely on fresh runner)
-      run: |
-        if [ ! -d "platforms/android" ]; then
-          cordova platform add android --no-save
-        else
-          echo "Android platform already added."
-        fi
+      - name: Build Android Release APK
+        run: cordova build android --release
 
-    - name: Build Android release APK
-      run: cordova build android --release
-
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-release-apk
-        path: platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk # Corrected filename
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apk
+          path: platforms/android/app/build/outputs/apk/release/*.apk
+          # For a production app on Google Play, you MUST sign it with your own keystore.
+          # The generated APK (often app-release-unsigned.apk) is not signed.
+          # Instructions for manual signing:
+          # 1. Generate a keystore: keytool -genkey -v -keystore my-release-key.keystore -alias alias_name -keyalg RSA -keysize 2048 -validity 10000
+          # 2. Sign the APK: jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk alias_name
+          # 3. Optimize the APK: zipalign 4 platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk my-app.apk
